@@ -7,7 +7,12 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'wiki_edits.db'}").replace("postgres://", "postgresql://", 1)
+_raw_db_url = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'wiki_edits.db'}")
+if _raw_db_url.startswith("postgres://"):
+    _raw_db_url = _raw_db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+elif _raw_db_url.startswith("postgresql://"):
+    _raw_db_url = _raw_db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+DATABASE_URL = _raw_db_url
 
 SSE_URL = os.getenv(
     "SSE_URL", "https://stream.wikimedia.org/v2/stream/recentchange"
