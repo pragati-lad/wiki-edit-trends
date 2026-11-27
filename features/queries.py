@@ -36,29 +36,20 @@ def edits_per_minute(session: Session, minutes: int = 30) -> pd.DataFrame:
     """Edits per minute for the last N minutes."""
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
 
-    # Use strftime for SQLite compatibility, extract for PostgreSQL
-    try:
-        rows = (
-            session.query(
-                func.strftime("%Y-%m-%d %H:%M", Edit.timestamp).label("minute"),
-                func.count().label("count"),
-            )
-            .filter(Edit.timestamp >= cutoff)
-            .group_by("minute")
-            .order_by("minute")
-            .all()
-        )
-    except Exception:
-        rows = (
-            session.query(
-                func.date_trunc("minute", Edit.timestamp).label("minute"),
-                func.count().label("count"),
-            )
-            .filter(Edit.timestamp >= cutoff)
-            .group_by("minute")
-            .order_by("minute")
-            .all()
-        )
+    # Use date_trunc for PostgreSQL, strftime for SQLite
+    dialect = session.bind.dialect.name if session.bind else "sqlite"
+    if dialect == "postgresql":
+        minute_col = func.date_trunc("minute", Edit.timestamp).label("minute")
+    else:
+        minute_col = func.strftime("%Y-%m-%d %H:%M", Edit.timestamp).label("minute")
+
+    rows = (
+        session.query(minute_col, func.count().label("count"))
+        .filter(Edit.timestamp >= cutoff)
+        .group_by("minute")
+        .order_by("minute")
+        .all()
+    )
 
     df = pd.DataFrame(rows, columns=["minute", "count"])
     if not df.empty:
